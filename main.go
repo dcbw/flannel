@@ -33,6 +33,7 @@ import (
 	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/remote"
 	"github.com/coreos/flannel/subnet"
+	"github.com/coreos/flannel/etcd"
 )
 
 type CmdLineOpts struct {
@@ -166,20 +167,20 @@ func isMultiNetwork() bool {
 	return len(opts.networks) > 0
 }
 
-func newSubnetManager() (subnet.Manager, error) {
+func newSubnetManager(eh *etcdhelper.EtcdHelper) (subnet.Manager, error) {
 	if opts.remote != "" {
 		return remote.NewRemoteManager(opts.remote, opts.remoteCAFile, opts.remoteCertfile, opts.remoteKeyfile)
 	}
 
-	cfg := &subnet.EtcdConfig{
-		Endpoints: strings.Split(opts.etcdEndpoints, ","),
-		Keyfile:   opts.etcdKeyfile,
-		Certfile:  opts.etcdCertfile,
-		CAFile:    opts.etcdCAFile,
-		Prefix:    opts.etcdPrefix,
-	}
+	return subnet.NewEtcdManager(eh), nil
+}
 
-	return subnet.NewEtcdManager(cfg)
+func newNetworkManager(eh *etcdhelper.EtcdHelper) (network.Manager, error) {
+//	if opts.remote != "" {
+//		return remote.NewRemoteManager(opts.remote, opts.remoteCAFile, opts.remoteCertfile, opts.remoteKeyfile)
+//	}
+
+	return network.NewEtcdManager(eh), nil
 }
 
 func initAndRun(ctx context.Context, sm subnet.Manager, netnames []string) {
@@ -263,9 +264,34 @@ func main() {
 
 	flagsFromEnv("FLANNELD", flag.CommandLine)
 
-	sm, err := newSubnetManager()
+	var (
+		eh *etcdhelper.EtcdHelper
+		err error
+	)
+	if opts.remote == "" {
+		cfg := &etcdhelper.EtcdConfig{
+			Endpoints: strings.Split(opts.etcdEndpoints, ","),
+			Keyfile:   opts.etcdKeyfile,
+			Certfile:  opts.etcdCertfile,
+			CAFile:    opts.etcdCAFile,
+			Prefix:    opts.etcdPrefix,
+		}
+		eh, err = etcdhelper.NewEtcdHelper(cfg)
+		if err != nil {
+			log.Error("Failed to create etcd client: ", err)
+			os.Exit(1)
+		}
+	}
+
+	sm, err := newSubnetManager(eh)
 	if err != nil {
 		log.Error("Failed to create SubnetManager: ", err)
+		os.Exit(1)
+	}
+
+	nm, err := newNetworkManager(eh, opts.subnetDir, opts.subnetFile)
+	if err != nil {
+		log.Error("Failed to create NetworkManager: ", err)
 		os.Exit(1)
 	}
 

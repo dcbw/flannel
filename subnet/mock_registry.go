@@ -16,11 +16,14 @@ package subnet
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/coreos/flannel/etcd"
 	"github.com/coreos/flannel/Godeps/_workspace/src/github.com/coreos/go-etcd/etcd"
 	"github.com/coreos/flannel/Godeps/_workspace/src/golang.org/x/net/context"
 )
+
 
 type mockSubnetRegistry struct {
 	config  *etcd.Node
@@ -150,14 +153,40 @@ func (msr *mockSubnetRegistry) deleteSubnet(ctx context.Context, network, sn str
 
 }
 
-func (msr *mockSubnetRegistry) watchSubnets(ctx context.Context, network string, since uint64) (*etcd.Response, error) {
+type watchError struct {
+	s string
+}
+
+func (e *watchError) Error() string {
+	return e.s
+}
+
+func (e *watchError) DoReset() bool {
+	return false
+}
+
+func (msr *mockSubnetRegistry) watchSubnets(ctx context.Context, network string, cursor interface{}) (*etcd.Response, etcdhelper.WatchError) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, &watchError{ctx.Err().Error()}
 
 		case r := <-msr.events:
-			if r.Node.ModifiedIndex < since {
+			nextIndex := uint64(0)
+
+			if wc, ok := cursor.(etcdhelper.WatchCursor); ok {
+				nextIndex = wc.Index
+			} else if s, ok := cursor.(string); ok {
+				var err error
+				nextIndex, err = strconv.ParseUint(s, 10, 64)
+				if err != nil {
+					return nil, &watchError{fmt.Sprintf("failed to parse cursor: %v", err)}
+				}
+			} else {
+				return nil, &watchError{fmt.Sprintf("internal error: watch cursor is of unknown type")}
+			}
+
+			if r.Node.ModifiedIndex < nextIndex {
 				continue
 			}
 			return r, nil
