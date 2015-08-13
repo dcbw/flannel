@@ -34,7 +34,7 @@ type Network struct {
 	be     backend.Backend
 }
 
-func New(sm subnet.Manager, name string, ipMasq bool) *Network {
+func NewNetwork(sm subnet.Manager, name string, ipMasq bool) *Network {
 	return &Network{
 		Name:   name,
 		sm:     sm,
