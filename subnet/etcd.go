@@ -57,6 +57,8 @@ func NewEtcdManager(config *EtcdConfig) (Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+fmt.Println(fmt.Sprintf("#### regex %s", config.Prefix + `/([^/]*)/config`))
+
 	return &EtcdManager{
 		registry:     r,
 		networkRegex: regexp.MustCompile(config.Prefix + `/([^/]*)`),
@@ -408,7 +410,9 @@ func parseSubnetWatchResponse(resp *etcd.Response) (LeaseWatchResult, error) {
 
 // Returns network name from the 'config' key
 func (m *EtcdManager) parseNetworkKey(s string) (string, error) {
-	if parts := m.networkRegex.FindStringSubmatch(s); len(parts) == 2 {
+	parts := m.networkRegex.FindStringSubmatch(s)
+fmt.Println(fmt.Sprintf("    string '%s' => parts %#v", s, parts))
+	if len(parts) == 2 {
 		return parts[1], nil
 	}
 
@@ -455,11 +459,13 @@ func (m *EtcdManager) parseNetworkWatchResponse(resp *etcd.Response) (NetworkWat
 // point for etcd watch.
 func (m *EtcdManager) getNetworks(ctx context.Context) ([]string, uint64, error) {
 	resp, err := m.registry.getNetworks(ctx)
+fmt.Println(fmt.Sprintf("RESP %#v err %#v", resp, err))
 
 	networks := []string{}
 
 	if err == nil {
 		for _, node := range resp.Node.Nodes {
+fmt.Println(fmt.Sprintf("    node key %#v", node.Key))
 			netname, err := m.parseNetworkKey(node.Key)
 			if err == nil {
 				networks = append(networks, netname)

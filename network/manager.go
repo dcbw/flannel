@@ -119,8 +119,10 @@ func NewNetworkManager(ctx context.Context, sm subnet.Manager) (*Manager, error)
 		manager.allowedNetworks[name] = true
 	}
 
+fmt.Println(fmt.Sprintf("ALLOWED: %#v, multi %d", manager.allowedNetworks, manager.isMultiNetwork()))
 	if manager.isMultiNetwork() {
 		foundNetworks, err := manager.sm.GetNetworks(ctx)
+fmt.Println(fmt.Sprintf("FOUND: %v", foundNetworks))
 		if err != nil {
 			return nil, err
 		}
