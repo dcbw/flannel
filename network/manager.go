@@ -188,6 +188,13 @@ func writeSubnetFile(path string, nw ip.IP4Net, ipMasq bool, bn backend.Network)
 	fmt.Fprintf(f, "FLANNEL_NETWORK=%s\n", nw)
 	fmt.Fprintf(f, "FLANNEL_SUBNET=%s\n", sn)
 	fmt.Fprintf(f, "FLANNEL_MTU=%d\n", bn.MTU())
+
+	if extraVars := bn.SubnetFileVars(); extraVars != nil {
+		for key, value := range extraVars {
+			fmt.Fprintf(f, "%s=%s\n", key, value)
+		}
+	}
+
 	_, err = fmt.Fprintf(f, "FLANNEL_IPMASQ=%v\n", ipMasq)
 	f.Close()
 	if err != nil {
